@@ -4,10 +4,13 @@
   "compatibilityLevel": "JAVA_17",
   "client": [
     "FormMixin",
+    "TrackCatalogMixin",
     "ModelIKRuntimeMixin",
+    "AnchorTrackMenuMixin",
     "CubicScaleMixin",
     "WeldScaleKeyMixin",
     "AnchorPropertyPathMixin",
+    "AnchorTrackIdentityMixin",
     "ModelPoseResetMixin",
     "AnchorFrameCacheMixin",
     "AnchorFrameSpanMixin",
@@ -17,7 +20,8 @@
     "SceneModelMatrixMixin",
     "FormRenderFrameMixin",
     "SceneIKGoalsMixin",
-    "ActorPlacementMixin"
+    "ActorPlacementMixin",
+    "NativeAnchorEditorMixin"
   ],
   "injectors": {
     "defaultRequire": 1
