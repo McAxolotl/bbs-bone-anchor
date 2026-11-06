@@ -34,12 +34,136 @@ dependencies {
 java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17; withSourcesJar() }
 tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
 processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand version: project.version } }
+tasks.register('anchorMathTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'mcaxolotl.boneanchor.AnchorMathTest'
+}
+check.dependsOn anchorMathTest
+// Regression tests are executable sanity mains, matching the BBS FS test convention.
+test { failOnNoDiscoveredTests = false }
 loom {
     mods {
         boneanchor { sourceSet sourceSets.main }
+        boneanchor_smoke { sourceSet sourceSets.test }
     }
+}
+def smokeReport = layout.projectDirectory.file('run/config/bbs_bone_anchor_smoke-report.txt')
+
+/** Expected in-game counters; a changed number is a real change, so update it deliberately. */
+def expectedSmokeReport = [
+    BONE_ANCHOR_SMOKE_OK: 68,
+    HIERARCHY_FILTER_CHECKS: 19,
+    IK_GOAL_CHECKS: 9,
+    NATIVE_PLACEMENT_CHECKS: 12,
+    ANCHOR_REBASE_CHECKS: 6,
+    RIG_CACHE_CHECKS: 7,
+    DEPENDENCY_REGRESSIONS_OK: 8,
+    SCENE_BINDING_CHECKS: 31,
+]
+
+def smokeRequested = { -> project.hasProperty('smoke') || gradle.taskGraph.hasTask(':smokeTest') }
+
+tasks.named('runClient') {
+    dependsOn testClasses
+    doFirst {
+        /* A stale report would answer for a run that never happened. */
+        if (smokeRequested()) {
+            systemProperty 'bbsboneanchor.smoke', 'true'
+            smokeReport.asFile.delete()
+        }
+    }
+}
+tasks.named('runClient') { classpath += sourceSets.test.runtimeClasspath }
+tasks.register('smokeJar', Jar) {
+    dependsOn testClasses
+    from sourceSets.test.output
+    archiveClassifier = 'smoke-dev'
+}
+tasks.register('remapSmokeJar', net.fabricmc.loom.task.RemapJarTask) {
+    dependsOn smokeJar
+    inputFile = tasks.smokeJar.archiveFile
+    archiveClassifier = 'smoke'
+    addNestedDependencies = false
 }
 
 // Ship only this addon's own classes, resources and manifest metadata.
 jar { manifest.attributes('Implementation-Vendor': 'McAxolotl') }
 tasks.withType(AbstractArchiveTask).configureEach { preserveFileTimestamps = false; reproducibleFileOrder = true }
+
+tasks.register('anchorPolicyTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'mcaxolotl.boneanchor.AnchorPolicyTest'
+}
+check.dependsOn anchorPolicyTest
+
+// Audits the project's own conventions, so a review never has to re-check them by hand.
+tasks.register('projectAuditTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'mcaxolotl.boneanchor.ProjectAuditTest'
+    workingDir = projectDir
+}
+check.dependsOn projectAuditTest
+
+// Audits the packaged jar: the mixin registry, the localization set and the files that must not ship.
+tasks.register('auditJar') {
+    dependsOn 'remapJar'
+    def remap = tasks.named('remapJar')
+    inputs.file(remap.flatMap { it.archiveFile })
+    doLast {
+        def archive = remap.get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(archive)
+        try {
+            def names = []
+            def entries = zip.entries()
+            while (entries.hasMoreElements()) names << entries.nextElement().name
+            def mixins = new groovy.json.JsonSlurper().parseText(zip.getInputStream(zip.getEntry('bbs_bone_anchor.mixins.json')).text)
+            mixins.client.each { name ->
+                /* Build the path by concatenation: a GString never equals a String in List.contains. */
+                def wanted = 'mcaxolotl/boneanchor/compat/mixin/' + name + '.class'
+                if (!names.contains(wanted)) throw new GradleException("Registered mixin is missing from the jar: ${name}")
+            }
+            def strings = names.findAll { it.startsWith('assets/bbs_bone_anchor/assets/strings/') && it.endsWith('.json') }
+            if (strings.size() != 19) throw new GradleException("Expected 19 localizations in the jar, found ${strings.size()}")
+            if (!names.contains('assets/bbs_bone_anchor/icon.png')) throw new GradleException('The metadata icon is missing from the jar')
+            def banned = names.findAll { it.toUpperCase().contains('LICENSE') || it.toUpperCase().contains('NOTICE') }
+            if (!banned.isEmpty()) throw new GradleException("The jar must not carry license or notice files: ${banned}")
+            logger.lifecycle("Jar audit passed: ${names.size()} entries, ${strings.size()} localizations")
+        } finally {
+            zip.close()
+        }
+    }
+}
+check.dependsOn auditJar
+
+// Runs the in-game suites in a dev client and compares the report with the expected counters.
+tasks.register('verifySmokeReport') {
+    def report = smokeReport
+    def expected = expectedSmokeReport
+    doLast {
+        def file = report.asFile
+        if (!file.isFile()) throw new GradleException("The in-game run wrote no report at ${report}")
+        def actual = [:]
+        file.readLines().each { line ->
+            def parts = line.trim().split(' ', 2)
+            if (parts.length == 2 && parts[1].isInteger()) actual[parts[0]] = parts[1] as Integer
+        }
+        if (actual.isEmpty()) throw new GradleException("The in-game report is not in the expected shape:\n${file.text}")
+        def problems = []
+        expected.each { name, count ->
+            def got = actual[name]
+            if (got == null) problems << "missing suite: ${name}"
+            else if (got != count) problems << "${name}: expected ${count}, got ${got}"
+        }
+        actual.keySet().findAll { !expected.containsKey(it) }.each { problems << "unexpected suite: ${it}" }
+        if (!problems.isEmpty()) throw new GradleException("In-game smoke does not match the expected report:\n - " + problems.join('\n - '))
+        logger.lifecycle("In-game smoke passed: ${actual}")
+    }
+}
+
+tasks.register('smokeTest') {
+    dependsOn 'runClient'
+    finalizedBy 'verifySmokeReport'
+}
