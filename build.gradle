@@ -1,0 +1,45 @@
+plugins { id 'fabric-loom' version '1.15-SNAPSHOT' }
+version = '1.0.0'
+group = 'mcaxolotl'
+base { archivesName = 'bbs-bone-anchor' }
+repositories {
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+    mavenCentral()
+}
+// Modrinth's shared Maven metadata mixes Minecraft versions. Select the latest compatible
+// public release through its API, then let Gradle fetch the artifact from the remote Maven repo.
+def bbsRelease = providers.provider {
+    def query = 'https://api.modrinth.com/v2/project/bbs-fs/version?game_versions=%5B%221.20.1%22%5D&loaders=%5B%22fabric%22%5D'
+    def connection = new URI(query).toURL().openConnection()
+    connection.setRequestProperty('User-Agent', 'McAxolotl/bbs-bone-anchor build')
+    connection.connectTimeout = 15000
+    connection.readTimeout = 30000
+    def versions = connection.inputStream.withCloseable { new groovy.json.JsonSlurper().parse(it) }
+    def releases = versions.findAll { it.version_type == 'release' && it.game_versions.contains('1.20.1') && it.loaders.contains('fabric') }
+    if (releases.isEmpty()) throw new GradleException('No stable BBS FS release supports Minecraft 1.20.1 / Fabric')
+    releases.max { it.date_published }
+}.get()
+logger.lifecycle("BBS FS latest compatible release: ${bbsRelease.version_number} (${bbsRelease.id})")
+
+dependencies {
+    minecraft 'com.mojang:minecraft:1.20.1'
+    mappings 'net.fabricmc:yarn:1.20.1+build.10:v2'
+    modImplementation 'net.fabricmc:fabric-loader:0.16.14'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.92.1+1.20.1'
+    modImplementation("maven.modrinth:bbs-fs:${bbsRelease.id}") { transitive = false }
+}
+java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17; withSourcesJar() }
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand version: project.version } }
+loom {
+    mods {
+        boneanchor { sourceSet sourceSets.main }
+    }
+}
+
+// Ship only this addon's own classes, resources and manifest metadata.
+jar { manifest.attributes('Implementation-Vendor': 'McAxolotl') }
+tasks.withType(AbstractArchiveTask).configureEach { preserveFileTimestamps = false; reproducibleFileOrder = true }
