@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "bbs_bone_anchor",
+  "version": "${version}",
+  "name": "BBS Bone Anchor",
+  "description": "Per-bone cross-model anchors for BBS FS; evaluated before IK and welds.",
+  "authors": [
+    "McAxolotl"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "bbs-addon": [
+      "mcaxolotl.boneanchor.BoneAnchorAddon"
+    ],
+    "bbs-client-addon": [
+      "mcaxolotl.boneanchor.client.BoneAnchorClient"
+    ]
+  },
+  "mixins": [
+    "bbs_bone_anchor.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "1.20.1",
+    "java": ">=17",
+    "fabric-api": "*",
+    "bbs": ">=2.7-1.20.1"
+  },
+  "icon": "assets/bbs_bone_anchor/icon.png"
+}

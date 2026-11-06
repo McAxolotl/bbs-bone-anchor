@@ -1,0 +1,25 @@
+{
+  "required": true,
+  "package": "mcaxolotl.boneanchor.compat.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "FormMixin",
+    "ModelIKRuntimeMixin",
+    "CubicScaleMixin",
+    "WeldScaleKeyMixin",
+    "AnchorPropertyPathMixin",
+    "ModelPoseResetMixin",
+    "AnchorFrameCacheMixin",
+    "AnchorFrameSpanMixin",
+    "InstanceModelMixin",
+    "InstanceAssetRevisionMixin",
+    "SceneMatrixMixin",
+    "SceneModelMatrixMixin",
+    "FormRenderFrameMixin",
+    "SceneIKGoalsMixin",
+    "ActorPlacementMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
