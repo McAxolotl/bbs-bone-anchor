@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Chỉ hiển thị xương đã liên kết"
+  "bbs_bone_anchor.bound_only": "Chỉ hiển thị xương đã liên kết",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Chuyển thành Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Sao chép thành Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Di chuyển bộ phận cơ thể và các track hình dạng sang Replay mới, rồi xóa bản gốc. Tạo keyframe Anchor để Replay mới tiếp tục đi theo đối tượng cha ban đầu.\n\nCác tham chiếu Anchor trong những Replay khác của phim này đang trỏ tới bộ phận gốc hoặc cây con của nó sẽ tự động được chuyển sang Replay mới.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Sao chép bộ phận cơ thể và các track hình dạng sang Replay mới, giữ lại bản gốc. Tạo keyframe Anchor để bản sao tiếp tục đi theo đối tượng cha ban đầu.\n\nCác tham chiếu Anchor hiện có trong những Replay khác vẫn trỏ tới bộ phận gốc, không chuyển sang bản sao."
 }

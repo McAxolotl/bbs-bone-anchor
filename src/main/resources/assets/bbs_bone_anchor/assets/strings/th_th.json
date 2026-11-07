@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "แสดงเฉพาะกระดูกที่ผูกไว้"
+  "bbs_bone_anchor.bound_only": "แสดงเฉพาะกระดูกที่ผูกไว้",
+  "bbs_bone_anchor.body_part.convert_to_replay": "แปลงเป็นรีเพลย์",
+  "bbs_bone_anchor.body_part.copy_as_replay": "คัดลอกเป็นรีเพลย์",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "ย้ายส่วนร่างกายและแทร็กรูปร่างไปยัง Replay ใหม่ และลบต้นฉบับ สร้างคีย์เฟรม Anchor เพื่อให้ Replay ใหม่ติดตามโหนดแม่เดิมต่อไป\n\nการอ้างอิง Anchor ใน Replay อื่นของภาพยนตร์นี้ที่ชี้ไปยังส่วนร่างกายต้นฉบับหรือโครงสร้างย่อยจะถูกเปลี่ยนให้ชี้ไปยัง Replay ใหม่โดยอัตโนมัติ",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "คัดลอกส่วนร่างกายและแทร็กรูปร่างไปยัง Replay ใหม่ โดยเก็บต้นฉบับไว้ สร้างคีย์เฟรม Anchor เพื่อให้สำเนาติดตามโหนดแม่เดิมต่อไป\n\nการอ้างอิง Anchor ที่มีอยู่ใน Replay อื่นยังคงชี้ไปยังส่วนร่างกายต้นฉบับ ไม่ใช่สำเนา"
 }

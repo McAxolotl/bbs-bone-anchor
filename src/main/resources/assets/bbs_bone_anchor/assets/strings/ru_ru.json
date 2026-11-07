@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Показывать только привязанные кости"
+  "bbs_bone_anchor.bound_only": "Показывать только привязанные кости",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Преобразовать в Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Копировать как Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Переносит часть тела и её дорожки формы в новый Replay и удаляет оригинал. Создаёт ключевой кадр Anchor, чтобы новый Replay следовал за исходным родителем.\n\nСсылки Anchor других Replay этого фильма на исходную часть тела или её поддерево автоматически перенаправляются на новый Replay.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Копирует часть тела и её дорожки формы в новый Replay, сохраняя оригинал. Создаёт ключевой кадр Anchor, чтобы копия следовала за исходным родителем.\n\nСуществующие ссылки Anchor других Replay остаются направленными на исходную часть тела, а не на копию."
 }

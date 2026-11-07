@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "바인딩된 뼈만 표시"
+  "bbs_bone_anchor.bound_only": "바인딩된 뼈만 표시",
+  "bbs_bone_anchor.body_part.convert_to_replay": "리플레이로 변환",
+  "bbs_bone_anchor.body_part.copy_as_replay": "리플레이로 복사",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "신체 부위와 형태 트랙을 새 Replay로 옮기고 원본을 제거합니다. 새 Replay가 원래 부모를 따르도록 Anchor 키프레임을 생성합니다.\n\n이 영화의 다른 Replay에서 원래 신체 부위나 그 하위 트리를 대상으로 하는 Anchor 참조는 자동으로 새 Replay를 가리키도록 변경됩니다.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "신체 부위와 형태 트랙을 새 Replay로 복사하고 원본은 유지합니다. 복사본이 원래 부모를 따르도록 Anchor 키프레임을 생성합니다.\n\n다른 Replay의 기존 Anchor 참조는 복사본이 아닌 원래 신체 부위를 계속 가리킵니다."
 }

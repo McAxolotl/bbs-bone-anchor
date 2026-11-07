@@ -51,6 +51,24 @@ public final class AnchorPolicyTest {
         property.set(new Anchor("target","hand",true,true,true));
         data.putString(unused,"present"); BoneAnchors.stripDefaults(defaults,data);
         check(data.has(unused), "Authored bone Anchor remains saved");
+
+        Anchor plain = new Anchor("source","part/bone",true,true,true);
+        plain.previous = new Anchor("source","part",true,true,true);
+        AnchorRetargeting.retarget(plain, "source", "part", "target");
+        check(plain.replay.equals("target") && plain.attachment.equals("bone"), "Plain Anchor path is rebased to the new Replay");
+        check(plain.previous.replay.equals("target") && plain.previous.attachment.isEmpty(), "Previous Anchor endpoint is rebased");
+        Anchor unrelated = new Anchor("other","part/bone",true,true,true);
+        AnchorRetargeting.retarget(unrelated, "source", "part", "target");
+        check(unrelated.replay.equals("other") && unrelated.attachment.equals("part/bone"), "Anchor on another Replay is untouched");
+        Anchor sibling = new Anchor("source", "part-other/bone", true, true, true);
+        AnchorRetargeting.retarget(sibling, "source", "part", "target");
+        check(sibling.replay.equals("source") && sibling.attachment.equals("part-other/bone"), "Similar sibling prefix is untouched");
+        BindingAnchor binding = new BindingAnchor();
+        binding.replay = "source";
+        binding.target(List.of("part","child"), "head");
+        AnchorRetargeting.retarget(binding, "source", "part", "target");
+        check(binding.replay.equals("target") && binding.targetPath.equals(List.of("child")) && "head".equals(binding.targetBone),
+            "Structured BindingAnchor path is rebased");
         checkLocalization();
         System.out.println("Anchor policies: " + count + " checks passed");
     }

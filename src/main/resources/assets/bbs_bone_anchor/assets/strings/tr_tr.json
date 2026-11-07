@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Yalnızca bağlı kemikleri göster"
+  "bbs_bone_anchor.bound_only": "Yalnızca bağlı kemikleri göster",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Replay'e dönüştür",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Replay olarak kopyala",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Vücut parçasını ve form izlerini yeni bir Replay'e taşır ve orijinali kaldırır. Yeni Replay'in eski üst öğeyi takip etmesi için bir Anchor anahtar karesi oluşturur.\n\nBu filmdeki diğer Replay'lerin orijinal vücut parçasını veya alt ağacını hedefleyen Anchor referansları otomatik olarak yeni Replay'e yönlendirilir.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Vücut parçasını ve form izlerini yeni bir Replay'e kopyalar, orijinali korur. Kopyanın eski üst öğeyi takip etmesi için bir Anchor anahtar karesi oluşturur.\n\nDiğer Replay'lerin mevcut Anchor referansları kopyayı değil, orijinal vücut parçasını hedeflemeye devam eder."
 }

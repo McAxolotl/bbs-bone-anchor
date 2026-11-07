@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "إظهار العظام المرتبطة فقط"
+  "bbs_bone_anchor.bound_only": "إظهار العظام المرتبطة فقط",
+  "bbs_bone_anchor.body_part.convert_to_replay": "تحويل إلى Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "نسخ إلى Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "ينقل جزء الجسم ومسارات الشكل الخاصة به إلى Replay جديد ويحذف الأصل. ينشئ إطار Anchor رئيسياً ليواصل Replay الجديد تتبّع الأصل الأب.\n\nتُعاد تلقائياً توجيه مراجع Anchor في عمليات Replay الأخرى في هذا الفيلم، التي تستهدف جزء الجسم الأصلي أو شجرته الفرعية، إلى Replay الجديد.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "ينسخ جزء الجسم ومسارات الشكل الخاصة به إلى Replay جديد مع إبقاء الأصل. ينشئ إطار Anchor رئيسياً لتواصل النسخة تتبّع الأصل الأب.\n\nتبقى مراجع Anchor الموجودة في عمليات Replay الأخرى موجّهة إلى جزء الجسم الأصلي، وليس إلى النسخة."
 }

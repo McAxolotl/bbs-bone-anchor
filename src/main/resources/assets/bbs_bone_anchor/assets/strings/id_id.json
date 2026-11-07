@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Tampilkan hanya tulang yang terikat"
+  "bbs_bone_anchor.bound_only": "Tampilkan hanya tulang yang terikat",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Ubah menjadi Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Salin sebagai Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Memindahkan bagian tubuh beserta track form-nya ke Replay baru dan menghapus yang asli. Membuat keyframe Anchor agar Replay baru mengikuti induk asalnya.\n\nReferensi Anchor dari Replay lain dalam film ini yang menargetkan bagian tubuh asli atau subpohonnya otomatis dialihkan ke Replay baru.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Menyalin bagian tubuh beserta track form-nya ke Replay baru dan mempertahankan yang asli. Membuat keyframe Anchor agar salinan mengikuti induk asalnya.\n\nReferensi Anchor yang sudah ada pada Replay lain tetap menargetkan bagian tubuh asli, bukan salinannya."
 }

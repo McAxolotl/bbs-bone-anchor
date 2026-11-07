@@ -35,7 +35,7 @@ public final class IntegrationTestAddon implements BBSAddonMod {
             try {
                 java.nio.file.Files.deleteIfExists(marker);
                 run();
-                String report = "BONE_ANCHOR_SMOKE_OK " + count + "\nHIERARCHY_FILTER_CHECKS " + AnchorTrackLayoutTest.run() + "\nIK_GOAL_CHECKS " + IkGoalTest.run() + "\nNATIVE_PLACEMENT_CHECKS " + NativePlacementTest.run() + "\nANCHOR_REBASE_CHECKS " + AnchorRebaseTest.run() + "\nRIG_CACHE_CHECKS " + RigInstanceCacheTest.run() + "\n" + DependencyRegressionTest.run() + "\nSCENE_BINDING_CHECKS " + SceneBindingTest.run();
+                String report = "BONE_ANCHOR_SMOKE_OK " + count + "\nHIERARCHY_FILTER_CHECKS " + AnchorTrackLayoutTest.run() + "\nIK_GOAL_CHECKS " + IkGoalTest.run() + "\nNATIVE_PLACEMENT_CHECKS " + NativePlacementTest.run() + "\nANCHOR_REBASE_CHECKS " + AnchorRebaseTest.run() + "\nRIG_CACHE_CHECKS " + RigInstanceCacheTest.run() + "\n" + DependencyRegressionTest.run() + "\nSCENE_BINDING_CHECKS " + SceneBindingTest.run() + "\nBODY_PART_EDITING_CHECKS " + BodyPartEditingTest.run();
                 System.out.println(report);
                 java.nio.file.Files.writeString(java.nio.file.Path.of("config/bbs_bone_anchor_smoke-report.txt"), report);
                 if (isolated) System.exit(0);

@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Only show bound bones"
+  "bbs_bone_anchor.bound_only": "Only show bound bones",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Convert to Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Copy as Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Moves the body part and its form tracks into a new Replay and removes the original. Creates an Anchor keyframe so the new Replay follows the original parent.\n\nAnchor references in other Replays in this film that target the original body part or its subtree are automatically retargeted to the new Replay.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Copies the body part and its form tracks into a new Replay, keeping the original. Creates an Anchor keyframe so the copy follows the original parent.\n\nExisting Anchor references in other Replays keep targeting the original body part, not the copy."
 }

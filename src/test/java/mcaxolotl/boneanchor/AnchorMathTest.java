@@ -49,6 +49,12 @@ public final class AnchorMathTest {
         }
         try { AnchorMath.parentLocal(parent, new Matrix4f().m30(Float.NaN)); throw new AssertionError("NaN target accepted"); }
         catch (IllegalArgumentException expected) { count++; }
+        Matrix4f oldParent = new Matrix4f().translation(3,-2,5).rotateXYZ(.2f,-.4f,.7f).scale(1.3f,-.8f,1.1f);
+        Matrix4f newParent = new Matrix4f().translation(-6,4,-3).rotateY(1.1f).scale(.7f);
+        Matrix4f oldLocal = new Matrix4f().translation(.4f,-.6f,.2f).rotateXYZ(-.3f,.5f,.1f).scale(1.2f,.9f,-1.4f);
+        Matrix4f rebased = AnchorMath.local(newParent, new Matrix4f(oldParent).mul(oldLocal));
+        near(new Matrix4f(newParent).mul(rebased).transformPosition(new Vector3f(1,2,3)),
+            new Matrix4f(oldParent).mul(oldLocal).transformPosition(new Vector3f(1,2,3)));
         System.out.println("Anchor math: " + count + " checks passed");
     }
 }

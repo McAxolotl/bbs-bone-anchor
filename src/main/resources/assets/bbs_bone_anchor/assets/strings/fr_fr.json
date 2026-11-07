@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Afficher uniquement les os liés"
+  "bbs_bone_anchor.bound_only": "Afficher uniquement les os liés",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Convertir en Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Copier en Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Déplace la partie du corps et ses pistes de forme dans un nouveau Replay et supprime l’original. Crée une image clé Anchor pour que le nouveau Replay suive le parent d’origine.\n\nLes références Anchor des autres Replays de ce film qui ciblent la partie d’origine ou son sous-arbre sont automatiquement redirigées vers le nouveau Replay.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Copie la partie du corps et ses pistes de forme dans un nouveau Replay en conservant l’original. Crée une image clé Anchor pour que la copie suive le parent d’origine.\n\nLes références Anchor existantes des autres Replays continuent de cibler la partie d’origine, pas la copie."
 }

@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Mostrar apenas ossos associados"
+  "bbs_bone_anchor.bound_only": "Mostrar apenas ossos associados",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Converter em Replay",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Copiar como Replay",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Move a parte do corpo e as suas pistas de forma para um novo Replay e remove o original. Cria um fotograma-chave Anchor para que o novo Replay siga o pai original.\n\nAs referências Anchor de outros Replays deste filme que apontam para a parte original ou a sua subárvore são redirecionadas automaticamente para o novo Replay.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Copia a parte do corpo e as suas pistas de forma para um novo Replay, mantendo o original. Cria um fotograma-chave Anchor para que a cópia siga o pai original.\n\nAs referências Anchor existentes noutros Replays continuam a apontar para a parte original, não para a cópia."
 }

@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_17",
   "client": [
     "FormMixin",
+    "FormPropertiesAccessor",
     "TrackCatalogMixin",
     "ModelIKRuntimeMixin",
     "AnchorTrackMenuMixin",
@@ -21,7 +22,8 @@
     "FormRenderFrameMixin",
     "SceneIKGoalsMixin",
     "ActorPlacementMixin",
-    "NativeAnchorEditorMixin"
+    "NativeAnchorEditorMixin",
+    "UIReplaysListPanelMixin"
   ],
   "injectors": {
     "defaultRequire": 1

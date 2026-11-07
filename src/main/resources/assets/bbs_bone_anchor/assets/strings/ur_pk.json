@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "صرف منسلک ہڈیاں دکھائیں"
+  "bbs_bone_anchor.bound_only": "صرف منسلک ہڈیاں دکھائیں",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Replay میں تبدیل کریں",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Replay کے طور پر نقل کریں",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "جسم کے حصے اور اس کے فارم ٹریکس کو ایک نئے Replay میں منتقل کرتا ہے اور اصل حصے کو ہٹا دیتا ہے۔ ایک Anchor کی فریم بناتا ہے تاکہ نیا Replay اصل والد کی پیروی کرتا رہے۔\n\nاس فلم کے دوسرے Replay میں اصل جسم کے حصے یا اس کی ذیلی شاخ کو ہدف بنانے والے Anchor حوالے خود بخود نئے Replay کی طرف منتقل ہو جاتے ہیں۔",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "جسم کے حصے اور اس کے فارم ٹریکس کی ایک نئے Replay میں نقل بناتا ہے اور اصل حصے کو برقرار رکھتا ہے۔ ایک Anchor کی فریم بناتا ہے تاکہ نقل اصل والد کی پیروی کرتی رہے۔\n\nدوسرے Replay کے موجودہ Anchor حوالے نقل کے بجائے اصل جسم کے حصے کو ہی ہدف بناتے رہتے ہیں۔"
 }

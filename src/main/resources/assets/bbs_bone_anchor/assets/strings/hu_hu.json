@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Csak a hozzárendelt csontok megjelenítése"
+  "bbs_bone_anchor.bound_only": "Csak a hozzárendelt csontok megjelenítése",
+  "bbs_bone_anchor.body_part.convert_to_replay": "Átalakítás replayre",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Másolás replayként",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Áthelyezi a testrészt és annak formasávjait egy új Replaybe, és eltávolítja az eredetit. Anchor kulcsképkockát hoz létre, hogy az új Replay kövesse az eredeti szülőt.\n\nA film többi Replayjének az eredeti testrészre vagy annak részfájára mutató Anchor hivatkozásai automatikusan az új Replayre irányulnak át.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Új Replaybe másolja a testrészt és annak formasávjait, az eredetit megtartva. Anchor kulcsképkockát hoz létre, hogy a másolat kövesse az eredeti szülőt.\n\nA többi Replay meglévő Anchor hivatkozásai továbbra is az eredeti testrészre mutatnak, nem a másolatra."
 }

@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "Nur gebundene Knochen anzeigen"
+  "bbs_bone_anchor.bound_only": "Nur gebundene Knochen anzeigen",
+  "bbs_bone_anchor.body_part.convert_to_replay": "In Replay umwandeln",
+  "bbs_bone_anchor.body_part.copy_as_replay": "Als Replay kopieren",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "Verschiebt den Körperteil und seine Formspuren in ein neues Replay und entfernt das Original. Ein Anchor-Keyframe lässt das neue Replay dem bisherigen übergeordneten Objekt folgen.\n\nAnchor-Verweise anderer Replays dieses Films auf den ursprünglichen Körperteil oder dessen Unterbaum werden automatisch auf das neue Replay umgeleitet.",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "Kopiert den Körperteil und seine Formspuren in ein neues Replay und behält das Original. Ein Anchor-Keyframe lässt die Kopie dem bisherigen übergeordneten Objekt folgen.\n\nBestehende Anchor-Verweise anderer Replays zeigen weiterhin auf den ursprünglichen Körperteil, nicht auf die Kopie."
 }

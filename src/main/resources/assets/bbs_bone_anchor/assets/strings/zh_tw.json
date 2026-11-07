@@ -1,3 +1,7 @@
 {
-  "bbs_bone_anchor.bound_only": "只顯示已綁定骨骼"
+  "bbs_bone_anchor.bound_only": "只顯示已綁定骨骼",
+  "bbs_bone_anchor.body_part.convert_to_replay": "轉換為回放",
+  "bbs_bone_anchor.body_part.copy_as_replay": "複製為回放",
+  "bbs_bone_anchor.body_part.convert_to_replay.tooltip": "將身體附件及其形態軌道移入新回放，並移除原身體附件。產生 Anchor 關鍵幀，讓新回放繼續跟隨原父級。\n\n當前影片中，其他回放指向原身體附件或其子樹的 Anchor 引用會自動重新指向新回放。",
+  "bbs_bone_anchor.body_part.copy_as_replay.tooltip": "將身體附件及其形態軌道複製到新回放，保留原身體附件。產生 Anchor 關鍵幀，讓副本繼續跟隨原父級。\n\n其他回放既有的 Anchor 引用仍指向原身體附件，不會自動改為引用新副本。"
 }

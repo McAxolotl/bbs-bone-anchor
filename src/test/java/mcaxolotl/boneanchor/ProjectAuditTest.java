@@ -15,7 +15,12 @@ public final class ProjectAuditTest {
     private static final List<String> LANGUAGES = List.of(
         "ar_ar", "de_de", "en_us", "es_es", "fr_fr", "hu_hu", "id_id", "ko_kr", "pl_pl",
         "pt_br", "pt_pt", "ru_ru", "th_th", "tr_tr", "uk_ua", "ur_pk", "vi_vn", "zh_cn", "zh_tw");
-    private static final String MENU_ACTION = "bbs_bone_anchor.bound_only";
+    private static final List<String> ACTION_KEYS = List.of(
+        "bbs_bone_anchor.bound_only",
+        "bbs_bone_anchor.body_part.convert_to_replay",
+        "bbs_bone_anchor.body_part.copy_as_replay",
+        "bbs_bone_anchor.body_part.convert_to_replay.tooltip",
+        "bbs_bone_anchor.body_part.copy_as_replay.tooltip");
     private static final Pattern TODO = Pattern.compile("\\b(TODO|FIXME|XXX|HACK)\\b");
     private static final Pattern RUN = Pattern.compile("(?m)^\\s*public static (int|String) run\\(\\)");
     private static final Pattern CJK = Pattern.compile("[\\u4e00-\\u9fff]");
@@ -70,8 +75,22 @@ public final class ProjectAuditTest {
         for (String language : LANGUAGES) {
             Path file = directory.resolve(language + ".json");
             JsonObject json = JsonParser.parseString(read(file)).getAsJsonObject();
-            check(json.size() == 1 && json.has(MENU_ACTION), "Only the addon's own string is defined: " + language);
-            check(!json.get(MENU_ACTION).getAsString().isBlank(), "Translation is not blank: " + language);
+            check(json.size() == ACTION_KEYS.size() && ACTION_KEYS.stream().allMatch(json::has),
+                "Only the addon's own strings are defined: " + language);
+            for (String key : ACTION_KEYS) {
+                check(json.has(key) && !json.get(key).getAsString().isBlank(), "Translation is not blank: " + language + "/" + key);
+            }
+            String convert = json.get("bbs_bone_anchor.body_part.convert_to_replay.tooltip").getAsString();
+            String copy = json.get("bbs_bone_anchor.body_part.copy_as_replay.tooltip").getAsString();
+            check(!convert.equals(copy) && convert.contains("\n\n") && copy.contains("\n\n"),
+                "Descriptions separate the action from its reference policy: " + language);
+            check(convert.substring(convert.indexOf("\n\n")).contains("Anchor") && copy.substring(copy.indexOf("\n\n")).contains("Anchor"),
+                "Both tooltips explain Anchor references: " + language);
+            if (language.equals("zh_cn")) {
+                check(convert.contains("自动重定向到新回放") && copy.contains("不会自动改为引用新副本"), "Chinese tooltips distinguish reference redirection");
+            } else if (language.equals("en_us")) {
+                check(convert.contains("automatically retargeted") && copy.contains("not the copy"), "English tooltips distinguish reference redirection");
+            }
         }
     }
 
@@ -127,7 +146,7 @@ public final class ProjectAuditTest {
         Path directory = root.resolve("src/test/java/mcaxolotl/boneanchor");
         String integration = read(directory.resolve("IntegrationTestAddon.java"));
         List<String> suites = new ArrayList<>();
-        try (var stream = Files.list(directory)) {
+        try (var stream = Files.walk(directory)) {
             for (Path file : stream.toList()) {
                 if (!file.toString().endsWith(".java")) continue;
                 String text = read(file);
