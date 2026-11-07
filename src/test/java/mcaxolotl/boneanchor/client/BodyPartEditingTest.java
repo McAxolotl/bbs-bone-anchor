@@ -58,8 +58,9 @@ public final class BodyPartEditingTest {
         copy();
         convert();
         guards();
-        frames();
         parentFrames();
+        standardRigFrames();
+        interpolation();
         menu();
         return count;
     }
@@ -132,6 +133,9 @@ public final class BodyPartEditingTest {
         check(restored.replays.getById(f.watcher.getId()).form.get().anchor.getOriginalValue().replay.equals(target.getId()), "Retargeted saved value survives reload");
         check(restored.replays.getById(f.source.getId()).form.get().parts.get(f.part.getId()) == null, "Removed part stays removed after reload");
         check(foreign(restored.replays.getById(target.getId())).size() == 2, "Unknown tracks survive reload");
+        Replay restoredTarget = restored.replays.getById(target.getId());
+        check(BindingAnchor.local(restoredTarget.form.get().anchor.get()), "Local inheritance survives film reload on the root value");
+        check(BindingAnchor.local((Anchor) firstValue(restoredTarget, TrackId.property("", "anchor"))), "Local inheritance survives film reload on the Anchor track");
 
         f.history.submitUndo(true);
         check(f.history.getUndoManager().getTotalUndos() == 1, "Conversion records one native undo entry");
@@ -146,6 +150,7 @@ public final class BodyPartEditingTest {
     private static void verifyTarget(Fixture f, Replay target) {
         Form form = target.form.get();
         Anchor anchor = form.anchor.getOriginalValue();
+        check(BindingAnchor.local(anchor), "Converted root retains its local inheritance space");
         check(anchor.replay.equals(f.source.getId()) && anchor.attachment.isEmpty(), "New root Anchor follows the former owner");
         check(anchor.transform.createMatrix().equals(f.anchor.transform.createMatrix(), 1e-5f), "BodyPart local transform is preserved");
         KeyframeChannel<?> channel = target.properties.get(TrackId.property("", "anchor"));
@@ -174,18 +179,6 @@ public final class BodyPartEditingTest {
         check(f.create(true) == null, "Detached BodyPart with a stale manager is rejected");
     }
 
-    private static void frames() {
-        Matrix4f parent = new Matrix4f().translation(1, 2, 3).rotateY(.8f).scale(2);
-        Matrix4f local = new Matrix4f().translation(3, -1, 2).rotateXYZ(.2f, .3f, -.4f).scale(-1, 2, .5f);
-        Anchor anchor = BodyPartEditing.frameAnchor("source", "bone", parent, new Matrix4f(parent).mul(local));
-        check(anchor != null && anchor.transform.createMatrix().equals(local, 1e-4f), "Mirrored TRS frame round-trips");
-        check(BodyPartEditing.frameAnchor("source", "bone", parent, new Matrix4f().m30(Float.NaN)) == null, "Non-finite world frame is rejected");
-        check(BodyPartEditing.frameAnchor("source", "bone", new Matrix4f(), new Matrix4f().m10(.5f)) == null, "Shear is rejected instead of silently approximated");
-        check(BodyPartEditing.frameAnchor("source", "bone", parent, new Matrix4f().scale(0)) == null, "Singular local frame is rejected");
-        check(BodyPartEditing.frameAnchor("source", "bone", new Matrix4f().scale(0), local) == null, "Singular parent frame is rejected");
-        check(BodyPartEditing.frameAnchor("source", "bone", parent, null) == null, "Missing world frame is rejected");
-    }
-
     private static void parentFrames() {
         Fixture f = new Fixture();
         StubEntity entity = new StubEntity(); entity.setForm(f.root); entity.setPosition(3, 4, 5);
@@ -207,10 +200,10 @@ public final class BodyPartEditingTest {
                 matrices.put(prefix, new Matrix4f(base), new Matrix4f(base));
                 Matrix4f modelBase = new Matrix4f(base).rotateY((float) Math.PI);
                 Matrix4f boneFrame = new Matrix4f(modelBase).mul(localBone);
-                matrices.put(StringUtils.combinePaths(prefix, "hand"), boneFrame, new Matrix4f(boneFrame));
+                if (model.getGroup("hand") != null) matrices.put(StringUtils.combinePaths(prefix, "hand"), boneFrame, new Matrix4f(boneFrame));
                 for (BodyPart part : f.root.parts.getAllTyped()) {
                     Matrix4f parent = new Matrix4f(modelBase);
-                    if (part.bone.get().equals("hand")) parent.mul(part.filterBoneMatrix(new Matrix4f(localBone)));
+                    if (part.bone.get().equals("hand") && model.getGroup("hand") != null) parent.mul(part.filterBoneMatrix(new Matrix4f(localBone)));
                     else parent.rotateY((float) Math.PI);
                     parent.mul(part.transform.get().createMatrix());
                     MatrixStack nested = new MatrixStack(); nested.peek().getPositionMatrix().set(parent);
@@ -221,6 +214,22 @@ public final class BodyPartEditingTest {
         f.root.transform.get().translate.set(2, -1, 3); f.root.transform.get().rotate.set(15, 30, -5);
         f.part.transform.get().translate.set(.5f, 1, -.2f); f.part.transform.get().rotate.set(10, -20, 30);
         f.partForm.transform.get().translate.set(.2f, -.1f, .3f);
+        Replay convertedReplay = f.film.replays.addReplay();
+        ModelForm convertedForm = new ModelForm();
+        convertedForm.transform.get().copy(f.partForm.transform.get());
+        convertedReplay.form.set(convertedForm);
+        StubEntity convertedEntity = new StubEntity(); convertedEntity.setForm(convertedForm);
+        controller.entities.put(convertedReplay.getId(), convertedEntity);
+        Replay nestedReplay = f.film.replays.addReplay();
+        ModelForm nestedForm = new ModelForm();
+        f.child.transform.get().translate.set(.4f, -.2f, .7f);
+        f.childForm.transform.get().rotate.set(10, -15, 20);
+        nestedForm.transform.get().copy(f.childForm.transform.get());
+        nestedReplay.form.set(nestedForm);
+        StubEntity nestedEntity = new StubEntity(); nestedEntity.setForm(nestedForm);
+        controller.entities.put(nestedReplay.getId(), nestedEntity);
+        nestedForm.anchor.set(BodyPartEditing.bodyPartAnchor(f.film, f.source, f.child));
+        BoneAnchorRuntime.remember(controller);
         try {
             for (String bone : List.of("", "missing", "hand")) {
                 f.part.bone.set(bone);
@@ -228,15 +237,145 @@ public final class BodyPartEditingTest {
                     f.part.inheritPosition.set((mask & 1) != 0);
                     f.part.inheritRotation.set((mask & 2) != 0);
                     f.part.inheritScale.set((mask & 4) != 0);
-                    Anchor anchor = BodyPartEditing.bodyPartAnchor(controller, f.source, f.part, 0);
-                    check(anchor != null, "BodyPart frame resolves for bone '" + bone + "' and inheritance " + mask);
-                    Matrix4f world = FilmMatrices.getAnchorMatrix(controller.entities, entity, f.source, 0, 0, 0, 0, new Anchor(f.source.getId(), f.path, true, true, true));
-                    Matrix4f converted = FilmMatrices.getAnchorMatrix(controller.entities, entity, f.source, 0, 0, 0, 0, anchor);
-                    converted.mul(FormUtilsClient.getRenderer(f.partForm).createEvaluatedTransform(0).createMatrix());
-                    check(converted.equals(world, 1e-4f), "Anchor preserves native matrix for bone '" + bone + "' and inheritance " + mask);
+                    Anchor anchor = BodyPartEditing.bodyPartAnchor(f.film, f.source, f.part);
+                    check(anchor != null && BindingAnchor.local(anchor), "Conversion preserves parent-local inheritance");
+                    check(anchor.inheritPosition == f.part.inheritPosition.get()
+                        && anchor.inheritRotation == f.part.inheritRotation.get()
+                        && anchor.inheritScale == f.part.inheritScale.get(), "All inheritance masks survive conversion");
+                    Anchor restored = KeyframeFactories.ANCHOR.fromData(anchor.toData());
+                    check(BindingAnchor.local(restored) && restored.equals(anchor), "Native Anchor factory retains local inheritance");
+                    check(!new Anchor(restored.replay, restored.attachment, restored.inheritPosition, restored.inheritRotation, restored.inheritScale).hasSameTarget(restored)
+                        && !restored.hasSameTarget(new Anchor(restored.replay, restored.attachment, restored.inheritPosition, restored.inheritRotation, restored.inheritScale)),
+                        "Native and local inheritance remain distinct in both interpolation directions");
+                    convertedForm.anchor.set(restored);
+                    for (int tick = 0; tick < 7; tick++) {
+                        // Move, rotate and rescale both the owner and its bone after conversion.
+                        entity.setPosition(3 + tick, 4 - tick, 5 + tick * 2);
+                        entity.setPrevX(entity.getX()); entity.setPrevY(entity.getY()); entity.setPrevZ(entity.getZ());
+                        entity.setBodyYaw(tick * 25); entity.setPrevBodyYaw(entity.getBodyYaw());
+                        f.root.transform.get().rotate.set(15 + tick * 12, 30 - tick * 20, -5 + tick * 7);
+                        f.root.transform.get().scale.set(tick == 2 ? -1.2f : 1.2f, .8f + tick * .2f, 1.4f);
+                        if (tick >= 3) f.root.transform.get().scale.set(tick == 3 || tick == 6 ? 0 : 1,
+                            tick == 4 || tick == 6 ? 0 : 1, tick == 5 || tick == 6 ? 0 : 1);
+                        localBone.identity().translation(2 + tick, 1 - tick * .5f, 3).rotateXYZ(.1f * tick, .3f + tick * .4f, -.2f * tick).scale(1.2f, .9f + tick * .1f, tick == 2 ? -.8f : .8f);
+                        Matrix4f expected = FilmMatrices.getMatrixForRenderWithRotation(entity, 0, 0, 0, 0)
+                            .mul(f.root.transform.get().createMatrix()).rotateY((float) Math.PI);
+                        if (bone.equals("hand")) expected.mul(f.part.filterBoneMatrix(new Matrix4f(localBone)));
+                        else expected.rotateY((float) Math.PI);
+                        expected.mul(f.part.transform.get().createMatrix()).mul(f.partForm.transform.get().createMatrix());
+                        Matrix4f actual = FilmMatrices.getAnchorMatrix(controller.entities, convertedEntity, convertedReplay, 0, 0, 0, 0, convertedForm.anchor.get());
+                        actual.mul(convertedForm.transform.get().createMatrix());
+                        check(actual.equals(expected, 2e-4f), "Dynamic parent equivalence for bone '" + bone + "', inheritance " + mask + ", sample " + tick);
+                        Matrix4f nestedExpected = new Matrix4f(expected).mul(f.child.transform.get().createMatrix()).mul(f.childForm.transform.get().createMatrix());
+                        Matrix4f nestedActual = FilmMatrices.getAnchorMatrix(controller.entities, nestedEntity, nestedReplay, 0, 0, 0, 0, nestedForm.anchor.get());
+                        nestedActual.mul(nestedForm.transform.get().createMatrix());
+                        check(nestedActual.equals(nestedExpected, 3e-4f), "Nested parent path remains dynamic across ancestor inheritance and motion");
+                    }
+                    f.root.transform.get().scale.set(1.2f, 1.1f, 1.4f);
+                    Anchor next = restored.copy(); next.inheritPosition = !next.inheritPosition;
+                    var scene = BindingScenes.scene(controller);
+                    check(NativeAnchorEditing.rebase(scene.root(convertedReplay.getId()), "", restored, next), "Native Keep transform supports converted whole-form Anchors");
+                    try (var request = BindingResolver.request(scene, 0)) {
+                        Matrix4f before = request.session.reference(scene.root(convertedReplay.getId()), null, restored).mul(restored.transform.createMatrix());
+                        Matrix4f after = request.session.reference(scene.root(convertedReplay.getId()), null, next).mul(next.transform.createMatrix());
+                        check(before.equals(after, 2e-4f), "Optional Keep transform preserves world placement when inheritance changes");
+                    }
+                }
+            }
+            f.part.bone.set("hand");
+            for (boolean initiallyPresent : List.of(false, true)) {
+                for (int mask = 0; mask < 8; mask++) {
+                    f.part.inheritPosition.set((mask & 1) != 0);
+                    f.part.inheritRotation.set((mask & 2) != 0);
+                    f.part.inheritScale.set((mask & 4) != 0);
+                    model.topGroups.clear();
+                    if (initiallyPresent) model.topGroups.add(new ModelGroup("hand"));
+                    model.initialize(); model.snapshotChannels();
+                    BindingAnchor anchor = (BindingAnchor) BodyPartEditing.bodyPartAnchor(f.film, f.source, f.part);
+                    check("hand".equals(anchor.targetBone), "Conversion retains a requested bone even while it is unavailable");
+                    convertedForm.anchor.set(KeyframeFactories.ANCHOR.fromData(anchor.toData()));
+                    for (boolean present : List.of(initiallyPresent, !initiallyPresent, initiallyPresent)) {
+                        model.topGroups.clear();
+                        if (present) model.topGroups.add(new ModelGroup("hand"));
+                        model.initialize(); model.snapshotChannels();
+                        Matrix4f expected = FilmMatrices.getMatrixForRenderWithRotation(entity, 0, 0, 0, 0)
+                            .mul(f.root.transform.get().createMatrix()).rotateY((float) Math.PI);
+                        if (present) expected.mul(f.part.filterBoneMatrix(new Matrix4f(localBone)));
+                        else expected.rotateY((float) Math.PI);
+                        expected.mul(f.part.transform.get().createMatrix()).mul(f.partForm.transform.get().createMatrix());
+                        Matrix4f actual = FilmMatrices.getAnchorMatrix(controller.entities, convertedEntity, convertedReplay, 0, 0, 0, 0, convertedForm.anchor.get());
+                        actual.mul(convertedForm.transform.get().createMatrix());
+                        check(actual.equals(expected, 3e-4f), "A missing or restored target bone uses the correct owning form frame");
+                        Matrix4f nestedExpected = new Matrix4f(expected).mul(f.child.transform.get().createMatrix()).mul(f.childForm.transform.get().createMatrix());
+                        Matrix4f nestedActual = FilmMatrices.getAnchorMatrix(controller.entities, nestedEntity, nestedReplay, 0, 0, 0, 0, nestedForm.anchor.get());
+                        nestedActual.mul(nestedForm.transform.get().createMatrix());
+                        check(nestedActual.equals(nestedExpected, 3e-4f), "Nested attachments retain owner placement when an ancestor bone disappears");
+                    }
                 }
             }
         } finally { BoneAnchorRuntime.forget(controller); }
+    }
+
+    private static void standardRigFrames() {
+        Fixture f = new Fixture();
+        Model model = new Model(null);
+        ModelGroup hand = new ModelGroup("hand");
+        hand.initial.translate.set(2, -3, 4); hand.initial.rotate.set(10, 20, -15);
+        model.topGroups.add(hand); model.initialize(); model.resetPose(); model.snapshotChannels();
+        ModelInstance instance = new ModelInstance("standard_conversion", model, null, null); instance.form = f.root;
+        f.root.setRenderer(new ModelFormRenderer(f.root) {
+            @Override public ModelInstance getModel() { return instance; }
+            @Override public void ensureAnimator(float transition) {}
+            @Override public ModelInstance evaluateChannels(IEntity entity, float transition) { return instance; }
+        });
+        StubEntity sourceEntity = new StubEntity(); sourceEntity.setForm(f.root);
+        sourceEntity.setPosition(-4, 2, 3); sourceEntity.setPrevX(-4); sourceEntity.setPrevY(2); sourceEntity.setPrevZ(3);
+        BaseFilmController controller = new BaseFilmController(f.film) {
+            @Override public int getTick() { return 0; }
+            @Override public Map<String, Integer> getActors() { return Map.of(); }
+        };
+        controller.entities.put(f.source.getId(), sourceEntity);
+        Replay replay = f.film.replays.addReplay();
+        ModelForm form = new ModelForm(); replay.form.set(form);
+        StubEntity entity = new StubEntity(); entity.setForm(form); controller.entities.put(replay.getId(), entity);
+        f.root.transform.get().translate.set(2, 1, -3); f.root.transform.get().rotate.set(20, 35, 10);
+        f.part.bone.set("hand"); f.part.transform.get().translate.set(.4f, -.6f, 1.2f);
+        BoneAnchorRuntime.remember(controller);
+        try {
+            for (int mask = 0; mask < 8; mask++) {
+                f.part.inheritPosition.set((mask & 1) != 0); f.part.inheritRotation.set((mask & 2) != 0); f.part.inheritScale.set((mask & 4) != 0);
+                form.anchor.set(BodyPartEditing.bodyPartAnchor(f.film, f.source, f.part));
+                for (int sample = 0; sample < 5; sample++) {
+                    f.root.transform.get().scale.set(sample == 0 || sample == 3 ? 0 : 1.2f,
+                        sample == 1 || sample == 3 ? 0 : .8f, sample == 3 ? 0 : 1.4f);
+                    instance.config.scale.set(new org.joml.Vector3f(sample == 2 ? 0 : sample == 4 ? -1 : 1, .9f, 1.1f));
+                    Matrix4f ownerBefore = f.root.transform.get().createMatrix();
+                    org.joml.Vector3f scaleBefore = new org.joml.Vector3f(instance.getScale());
+                    MatrixCache captured = new MatrixCache(); instance.captureMatrices(captured);
+                    Matrix4f expected = FilmMatrices.getMatrixForRenderWithRotation(sourceEntity, 0, 0, 0, 0)
+                        .mul(ownerBefore).scale(scaleBefore).rotateY((float) Math.PI)
+                        .mul(f.part.filterBoneMatrix(new Matrix4f(captured.get("hand").matrix())))
+                        .mul(f.part.transform.get().createMatrix());
+                    Matrix4f actual = FilmMatrices.getAnchorMatrix(controller.entities, entity, replay, 0, 0, 0, 0, form.anchor.get());
+                    check(actual.equals(expected, 3e-4f), "Standard rig capture preserves partial inheritance through owner and asset zero scales");
+                    check(f.root.transform.get().createMatrix().equals(ownerBefore) && instance.getScale().equals(scaleBefore)
+                        && !BindingResolver.localCollection(f.root), "Local bone evaluation restores query state and never edits source transforms");
+                }
+            }
+        } finally { BoneAnchorRuntime.forget(controller); }
+    }
+
+    private static void interpolation() {
+        Fixture f = new Fixture();
+        Anchor local = f.anchor;
+        Anchor nativeAnchor = new Anchor(local.replay, local.attachment, true, true, true);
+        Anchor intoLocal = KeyframeFactories.ANCHOR.interpolate(nativeAnchor, nativeAnchor, local, local,
+            mchorse.bbs_mod.utils.interps.Interpolations.LINEAR, .5f);
+        Anchor intoNative = KeyframeFactories.ANCHOR.interpolate(local, local, nativeAnchor, nativeAnchor,
+            mchorse.bbs_mod.utils.interps.Interpolations.LINEAR, .5f);
+        check(BindingAnchor.local(intoLocal) && intoLocal.previous != null && !BindingAnchor.local(intoLocal.previous), "Native-to-local interpolation retains both inheritance spaces");
+        check(!BindingAnchor.local(intoNative) && intoNative.previous != null && BindingAnchor.local(intoNative.previous), "Local-to-native interpolation retains both inheritance spaces");
+        check(!(KeyframeFactories.ANCHOR.fromData(nativeAnchor.toData()) instanceof BindingAnchor), "Ordinary native Anchor data retains its original factory behavior");
     }
 
     private static void menu() {
@@ -328,7 +467,7 @@ public final class BodyPartEditingTest {
         final ModelForm root = new ModelForm(), partForm = new ModelForm(), childForm = new ModelForm();
         final BodyPart part = new BodyPart("11111111"), child = new BodyPart("22222222"), sibling = new BodyPart("33333333");
         final String path;
-        final Anchor anchor = new Anchor(source.getId(), "", true, true, true);
+        final BindingAnchor anchor = new BindingAnchor();
         final KeyframeChannel<Float> lighting;
         final TrackId emptyTrack = TrackId.property("", "lighting");
 
@@ -339,6 +478,7 @@ public final class BodyPartEditingTest {
             child.setForm(childForm); partForm.parts.addBodyPart(child);
             sibling.setForm(new ModelForm()); root.parts.addBodyPart(sibling);
             path = FormUtils.getPath(partForm);
+            anchor.replay = source.getId(); anchor.target(List.of(), null); anchor.localInheritance = true;
             anchor.transform.translate.set(1, 2, 3);
             source.category.set("props"); source.looping.set(1); source.shadow.set(false);
             source.label.set("source label"); source.actor.set(true); source.fp.set(true);

@@ -22,6 +22,8 @@ public final class BindingResolver {
     private static final ThreadLocal<Session> CURRENT=new ThreadLocal<>();
     private static final ThreadLocal<Integer> NATIVE=ThreadLocal.withInitial(()->0);
     private static final ThreadLocal<Query> QUERY=new ThreadLocal<>();
+    private static final ThreadLocal<Form> LOCAL_FORM=new ThreadLocal<>();
+    public static boolean localCollection(Form form){return LOCAL_FORM.get()==form;}
     private record Query(BindingScenes.Slot slot,Map<String,Override> overrides,Map<String,Vector3f> goals){}
     private static final ThreadLocal<ModelInstance> DISPATCH=new ThreadLocal<>();
     static boolean intercept(ModelInstance instance,Map<String,Vector3f> targets,Map<String,Vector3f> poles,float transition) {
@@ -184,7 +186,7 @@ public final class BindingResolver {
         private Matrix4f nativeBeforePart(BindingScenes.Slot slot) {
             if(slot.parent!=null && nativeParents.containsKey(slot)) {
                 Matrix4f partInverse=invertOrNull(slot.part.transform.get().createMatrix());
-                return partInverse==null?new Matrix4f(nativeParents.get(slot)):new Matrix4f(nativeParents.get(slot)).mul(partInverse);
+                if(partInverse!=null)return new Matrix4f(nativeParents.get(slot)).mul(partInverse);
             }
             if(slot.parent==null) {
                 var replay=scene.controller.film==null?null:scene.controller.film.replays.getList().stream().filter(r->r.getId().equals(slot.actor)).findFirst().orElse(null);
@@ -193,22 +195,19 @@ public final class BindingResolver {
                 }
                 return FilmMatrices.getMatrixForRenderWithRotation(slot.entity,0,0,0,transition);
             }
-            BindingScenes.Slot owner=slot.parent;Matrix4f base=modelBase(owner);
-            if(owner.form instanceof ModelForm) {
-                Matrix4f local=null;
-                if(!slot.part.bone.get().isEmpty()) {
-                    Matrix4f world=bone(owner,slot.part.bone.get());Matrix4f inverse=invertOrNull(base);
-                    if(world!=null && inverse!=null)local=inverse.mul(world);
-                }
-                local=slot.part.filterBoneMatrix(local);
-                return base.mul(local==null?new Matrix4f().rotateY((float)Math.PI):local);
+            return attachmentFrame(slot.parent,slot.part.bone.get(),slot.part.inheritPosition.get(),
+                slot.part.inheritRotation.get(),slot.part.inheritScale.get());
+        }
+        /** BodyPart inheritance is applied before the owner frame, which may be singular. */
+        private Matrix4f attachmentFrame(BindingScenes.Slot owner,String bone,boolean position,boolean rotation,boolean scale) {
+            if(bone==null || bone.isEmpty() || !declared(owner,bone))return frame(owner);
+            Matrix4f local=localBone(owner,bone);
+            if(local==null)return frame(owner);
+            if(!position || !rotation || !scale) {
+                Matrix4f fallback=new Matrix4f().rotateY((float)Math.PI);
+                local=mchorse.bbs_mod.utils.joml.Matrices.compose(position?local:fallback,rotation?local:fallback,scale?local:fallback);
             }
-            var hierarchy=FormUtilsClient.getRenderer(owner.form).getBoneHierarchy();
-            if(hierarchy!=null && !slot.part.bone.get().isEmpty()) {
-                Matrix4f world=bone(owner,slot.part.bone.get());Matrix4f inverse=invertOrNull(base);
-                if(world!=null && inverse!=null)return base.mul(slot.part.filterBoneMatrix(inverse.mul(world)));
-            }
-            return base;
+            return modelBase(owner).mul(local);
         }
         public Matrix4f frame(BindingScenes.Slot slot) {
             return node(slot,"frame",null,()->{
@@ -246,11 +245,17 @@ public final class BindingResolver {
                 .getDeclaringClass()!=ModelFormRenderer.class;}
             catch(ReflectiveOperationException error){return true;}
         }
-        private MatrixCache nativeMatrices(BindingScenes.Slot slot) {
+        private MatrixCache nativeMatrices(BindingScenes.Slot slot) {return nativeMatrices(slot,false);}
+        private MatrixCache nativeMatrices(BindingScenes.Slot slot,boolean local) {
             List<RigPose.Scope> scopes=new ArrayList<>();saveSubtree(slot,scopes);
+            Form previous=LOCAL_FORM.get();if(local)LOCAL_FORM.set(slot.form);
             NATIVE.set(NATIVE.get()+1);
             try{return FormUtilsClient.getRenderer(slot.form).collectMatrices(slot.entity,transition);}
-            finally{NATIVE.set(NATIVE.get()-1);for(int i=scopes.size()-1;i>=0;i--)scopes.get(i).close();}
+            finally{
+                NATIVE.set(NATIVE.get()-1);
+                if(previous==null)LOCAL_FORM.remove();else LOCAL_FORM.set(previous);
+                for(int i=scopes.size()-1;i>=0;i--)scopes.get(i).close();
+            }
         }
         private void saveSubtree(BindingScenes.Slot slot,List<RigPose.Scope> scopes) {
             if(FormUtilsClient.getRenderer(slot.form) instanceof ModelFormRenderer renderer) {
@@ -344,8 +349,7 @@ public final class BindingResolver {
                         state.pose.apply(model);state.instance.form=form;
                         ModelConstraintsRuntime.apply(state.instance);
                         MatrixCache captured=new MatrixCache();state.instance.captureMatrices(captured);
-                        Matrix4f matrix=captured.get(bone).matrix(),world=matrix==null?null:modelBase(slot).mul(matrix);
-                        return world!=null && world.isFinite()?world:null;
+                        return capturedBone(slot,bone,captured);
                     }
                 }
                 for(String tip:selected){var config=form.bones.getBone(tip);needed.addAll(model.getHierarchyGroups(config.ikTarget.get()));}
@@ -364,9 +368,39 @@ public final class BindingResolver {
                         ((ModelFormRenderer)FormUtilsClient.getRenderer(form)).solveIK(state.instance,parent(slot),transition);
                         ModelConstraintsRuntime.apply(state.instance);
                         MatrixCache captured=new MatrixCache();state.instance.captureMatrices(captured);
-                        Matrix4f matrix=captured.get(bone).matrix(),world=matrix==null?null:modelBase(slot).mul(matrix);
-                        return world!=null && world.isFinite()?world:null;
+                        return capturedBone(slot,bone,captured);
                     } finally {QUERY.set(old);controls.forEach((key,value)->setRuntime(key,value));}
+                }
+            });
+        }
+        private Matrix4f capturedBone(BindingScenes.Slot slot,String bone,MatrixCache captured) {
+            Matrix4f local=captured.get(bone).matrix();
+            if(local==null || !local.isFinite())return null;
+            matrices.put(new Node(slot,"captured_local",bone),new Matrix4f(local));
+            Matrix4f world=modelBase(slot).mul(local);
+            return world.isFinite()?world:null;
+        }
+        private Matrix4f localBone(BindingScenes.Slot slot,String bone) {
+            MatrixCache rendered=live.get(slot);
+            if(rendered!=null && rendered.has(bone))return new Matrix4f(rendered.get(bone).matrix());
+            return node(slot,"local",bone,()->{
+                bone(slot,bone);
+                Matrix4f captured=matrices.get(new Node(slot,"captured_local",bone));
+                if(captured!=null)return new Matrix4f(captured);
+                Fk state=fk(slot);
+                if(state.fallback==null && state.instance!=null && state.instance.model instanceof Model model) {
+                    // FK and binding overrides are already evaluated by bone(); capture before placement.
+                    try(RigPose.Scope scope=RigPose.scope(state.instance)) {
+                        state.pose.apply(model);apply(model,overrides.getOrDefault(slot,Map.of()));
+                        MatrixCache local=new MatrixCache();state.instance.captureMatrices(local);
+                        Matrix4f matrix=local.get(bone).matrix();return matrix==null?null:new Matrix4f(matrix);
+                    }
+                }
+                // Mob, CEM and custom collectors supply native bone matrices without owner transforms.
+                try(StateValues values=StateValues.of(slot,transition)) {
+                    Matrix4f matrix=nativeMatrices(slot,true).get(bone).matrix();
+                    if(matrix==null)return null;
+                    return slot.form instanceof ModelForm?new Matrix4f().rotateY(-(float)Math.PI).mul(matrix):new Matrix4f(matrix);
                 }
             });
         }
@@ -460,6 +494,14 @@ public final class BindingResolver {
             Matrix4f target;
             if(!value.hasTarget())target=new Matrix4f(fallback);
             else {
+                if(BindingAnchor.local(value)) {
+                    BindingAnchor binding=(BindingAnchor)value;
+                    var owner=scene.slot(value.replay,binding.targetPath);
+                    if(owner==null)throw new IllegalArgumentException("Anchor target form does not exist: "+value.attachment);
+                    checkSpace(source,owner);
+                    return attachmentFrame(owner,binding.targetBone,value.inheritPosition,value.inheritRotation,value.inheritScale)
+                        .mul(value.transform.createMatrix());
+                }
                 Address address=address(value);
                 if(address==null) {
                     if(sourceBone==null && source.parent==null) {

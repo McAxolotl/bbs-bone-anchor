@@ -5,6 +5,8 @@
   "client": [
     "FormMixin",
     "FormPropertiesAccessor",
+    "AnchorKeyframeFactoryMixin",
+    "AnchorInheritanceMixin",
     "TrackCatalogMixin",
     "ModelIKRuntimeMixin",
     "AnchorTrackMenuMixin",

@@ -55,14 +55,6 @@ public final class AnchorMath {
             scale?targetPose.scale:basePose.scale);
     }
 
-    /** Express a world frame relative to a parent frame. */
-    public static Matrix4f local(Matrix4f parentWorld, Matrix4f world) {
-        if (world == null || !world.isFinite()) throw new IllegalArgumentException("Anchor world frame is non-finite");
-        Matrix4f local = inverse(parentWorld).mul(world);
-        if (!local.isFinite()) throw new IllegalArgumentException("Anchor local frame is non-finite");
-        return local;
-    }
-
     public static Vector3f offset(Vector3f desiredPivot, Vector3f translate, Vector3f restPivot) {
         return new Vector3f(desiredPivot).sub((2 * restPivot.x - translate.x) / 16f, translate.y / 16f, translate.z / 16f);
     }

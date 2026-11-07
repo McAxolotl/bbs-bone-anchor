@@ -5,18 +5,16 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
-import mcaxolotl.boneanchor.AnchorMath;
+import mcaxolotl.boneanchor.BindingAnchor;
 import mcaxolotl.boneanchor.AnchorRetargeting;
 import mcaxolotl.boneanchor.BoneAnchors;
 import mcaxolotl.boneanchor.compat.mixin.FormPropertiesAccessor;
 import mchorse.bbs_mod.data.types.MapType;
-import mchorse.bbs_mod.film.BaseFilmController;
 import mchorse.bbs_mod.film.Film;
 import mchorse.bbs_mod.film.replays.FormProperties;
 import mchorse.bbs_mod.film.replays.Replay;
 import mchorse.bbs_mod.film.replays.tracks.TrackId;
 import mchorse.bbs_mod.forms.FormUtils;
-import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.MobForm;
@@ -32,10 +30,8 @@ import mchorse.bbs_mod.ui.forms.editors.UIForms;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.utils.context.ContextMenuManager;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
-import mchorse.bbs_mod.utils.StringUtils;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
-import org.joml.Matrix4f;
 
 /**
  * Converts a BodyPart's nested form into a Replay and expresses the former
@@ -79,7 +75,7 @@ public final class BodyPartEditing {
 
     private static void createReplay(UIFilmPanel panel, Replay source, BodyPart part, boolean move) {
         if (!convertible(panel, source, part)) return;
-        Anchor anchor = bodyPartAnchor(panel.getController().editorController, source, part, 0F);
+        Anchor anchor = bodyPartAnchor(panel.getData(), source, part);
         panel.flushUndo();
         Replay target = createReplay(panel.getData(), source, part, anchor, panel.getCursor(), move);
         if (target == null) return;
@@ -92,7 +88,8 @@ public final class BodyPartEditing {
     /** Prepare the new Replay before mutating the film, then record the conversion as one edit. */
     @SuppressWarnings("unchecked")
     static Replay createReplay(Film film, Replay source, BodyPart part, Anchor anchor, float cursor, boolean move) {
-        if (!ownsPart(film, source, part) || anchor == null || !Float.isFinite(cursor)) return null;
+        if (!ownsPart(film, source, part) || anchor == null || !Float.isFinite(cursor)
+            || !anchor.transform.createMatrix().isFinite()) return null;
         Form bodyPartForm = FormUtils.copy(part.getForm());
         if (bodyPartForm == null) return null;
         String sourcePrefix = FormUtils.getPath(part.getForm());
@@ -101,7 +98,7 @@ public final class BodyPartEditing {
         copyReplayPresentation(source, target);
         target.keyframes.fromData(source.keyframes.toData());
         target.form.set(bodyPartForm);
-        transferFormTracks(source, target, sourcePrefix);
+        transferFormTracks(source.properties, target.properties, sourcePrefix);
         clearRootAnchors(bodyPartForm);
         removeRootAnchorTracks(target.properties);
         bodyPartForm.anchor.set(anchor.copy());
@@ -113,50 +110,28 @@ public final class BodyPartEditing {
             film.replays.add(target);
             if (move) {
                 retargetAnchors(film, source.getId(), sourcePrefix, target.getId());
-                removeFormTracks(source, sourcePrefix);
+                removeFormTracks(source.properties, sourcePrefix);
                 BaseValue.edit(source.form, value -> owner.parts.removeBodyPart(part));
             }
         });
         return target;
     }
 
-    /** Reuse the runtime's BodyPart frame, including model-space flips and filtered inheritance. */
-    static Anchor bodyPartAnchor(BaseFilmController controller, Replay source, BodyPart part, float transition) {
-        if (controller == null || !ownsPart(controller.film, source, part)) return null;
-        var scene = BindingScenes.scene(controller);
-        var slot = scene.slot(source.getId(), List.of(FormUtils.getPath(part.getForm()).split("/")));
-        if (slot == null || slot.parent == null) return null;
-        Form owner = slot.parent.form;
+    /** Preserve the binding itself, including the space in which inheritance is evaluated. */
+    static Anchor bodyPartAnchor(Film film, Replay source, BodyPart part) {
+        if (!ownsPart(film, source, part)) return null;
+        Form owner = part.getManager().getOwner();
         String bone = part.bone.get();
-        boolean validBone = (owner instanceof ModelForm || owner instanceof MobForm)
-            && !bone.isEmpty() && FormUtilsClient.getBones(owner).contains(bone);
-        String ownerPath = String.join("/", slot.parent.path);
-        String attachment = validBone ? StringUtils.combinePaths(ownerPath, bone) : ownerPath;
-        try (var request = BindingResolver.request(scene, transition)) {
-            Matrix4f parentFrame = validBone ? request.session.bone(slot.parent, bone) : request.session.frame(slot.parent);
-            return frameAnchor(source.getId(), attachment, parentFrame, request.session.parent(slot));
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    /**
-     * Anchor that keeps a world frame under the parent frame it used to have. The local transform is
-     * what preserves the sampled frame: the new whole-form Anchor resolves back to the frame the
-     * BodyPart occupied, instead of snapping onto its former parent.
-     */
-    static Anchor frameAnchor(String replay, String attachment, Matrix4f parentFrame, Matrix4f worldFrame) {
-        if (replay == null || attachment == null || parentFrame == null || worldFrame == null) return null;
-
-        Anchor anchor = new Anchor(replay, attachment, true, true, true);
-        try {
-            Matrix4f local = AnchorMath.local(parentFrame, worldFrame);
-            AnchorMath.decompose(local);
-            anchor.transform.fromMatrix(local);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-
+        boolean boneTarget = (owner instanceof ModelForm || owner instanceof MobForm) && !bone.isEmpty();
+        String ownerPath = FormUtils.getPath(owner);
+        BindingAnchor anchor = new BindingAnchor();
+        anchor.replay = source.getId();
+        anchor.target(ownerPath.isEmpty() ? List.of() : List.of(ownerPath.split("/")), boneTarget ? bone : null);
+        anchor.localInheritance = true;
+        anchor.inheritPosition = part.inheritPosition.get();
+        anchor.inheritRotation = part.inheritRotation.get();
+        anchor.inheritScale = part.inheritScale.get();
+        anchor.transform.copy(part.transform.get());
         return anchor;
     }
 
@@ -216,20 +191,20 @@ public final class BodyPartEditing {
 
     /** Copy tracks by their structured address; raw bone names are never parsed as paths. */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static void transferFormTracks(Replay source, Replay target, String sourcePrefix) {
-        for (TrackId id : source.properties.tracks.keySet()) {
+    static void transferFormTracks(FormProperties source, FormProperties target, String sourcePrefix) {
+        for (TrackId id : source.tracks.keySet()) {
             if (!belongsTo(id.formPath(), sourcePrefix)) continue;
-            KeyframeChannel<?> channel = source.properties.tracks.get(id);
+            KeyframeChannel<?> channel = source.tracks.get(id);
             if (channel == null) continue;
 
             String relative = relativePath(id.formPath(), sourcePrefix);
             TrackId moved = new TrackId(id.kind(), relative, id.subject(), id.property());
             KeyframeChannel copied = new KeyframeChannel<>(moved.toKey(), channel.getFactory());
             copied.copyKeyframes(channel);
-            target.properties.put(moved, copied);
+            target.put(moved, copied);
         }
 
-        transferForeignTracks(source.properties, target.properties, sourcePrefix);
+        transferForeignTracks(source, target, sourcePrefix);
     }
 
     private static void transferForeignTracks(FormProperties source, FormProperties target, String sourcePrefix) {
@@ -242,11 +217,11 @@ public final class BodyPartEditing {
         }
     }
 
-    private static void removeFormTracks(Replay source, String prefix) {
-        for (TrackId id : new ArrayList<>(source.properties.tracks.keySet())) {
-            if (belongsTo(id.formPath(), prefix)) source.properties.remove(id);
+    static void removeFormTracks(FormProperties source, String prefix) {
+        for (TrackId id : new ArrayList<>(source.tracks.keySet())) {
+            if (belongsTo(id.formPath(), prefix)) source.remove(id);
         }
-        ((FormPropertiesAccessor)(Object) source.properties).boneAnchor$foreignTracks()
+        ((FormPropertiesAccessor)(Object) source).boneAnchor$foreignTracks()
             .removeIf(data -> data.has("form") && belongsTo(data.getString("form"), prefix));
     }
 
@@ -270,7 +245,7 @@ public final class BodyPartEditing {
         return path.equals(prefix) ? "" : path.substring(prefix.length() + 1);
     }
 
-    private static void removeRootAnchorTracks(FormProperties properties) {
+    static void removeRootAnchorTracks(FormProperties properties) {
         properties.remove(TrackId.property("", "anchor"));
         for (TrackId id : new ArrayList<>(properties.tracks.keySet())) {
             if (id.formPath().isEmpty() && id.is(mchorse.bbs_mod.film.replays.tracks.TrackKind.PROPERTY) && BoneAnchors.isKey(id.subject())) {

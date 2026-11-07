@@ -33,9 +33,11 @@ public final class BindingScenes {
             Set<String> seen = new HashSet<>(); byForm.clear(); enabled = false;
             for (var actor : controller.getEntities().entrySet())
                 walk(actor.getKey(),List.of(),actor.getValue().getForm(),actor.getValue(),null,null,seen,0);
-            if(controller.film!=null)for(var replay:controller.film.replays.getList())
+            if(controller.film!=null)for(var replay:controller.film.replays.getList()) {
+                enabled |= localDefinitions(replay.properties);
                 for(var id:replay.properties.tracks.keySet())
                     enabled |= id.kind()==mchorse.bbs_mod.film.replays.tracks.TrackKind.PROPERTY && id.formPath().isEmpty() && BoneAnchors.isKey(id.subject());
+            }
             for (String key : new ArrayList<>(slots.keySet())) if (!seen.contains(key)) {
                 RigInstances.release(slots.remove(key).form);
             }
@@ -86,14 +88,25 @@ public final class BindingScenes {
     }
     private static boolean customBinding(Form form,boolean nested) {
         if(nested)return false;
+        for(var endpoint:AnchorReferences.endpoints(form.anchor.get()))if(BindingAnchor.local(endpoint))return true;
         for(var value:form.getAll())if(BoneAnchors.isKey(value.getId()) && value instanceof BaseValueBasic<?> basic
             && basic.get() instanceof mchorse.bbs_mod.forms.forms.utils.Anchor a && BoneAnchors.contributes(a))return true;
         return false;
     }
     private static boolean definitions(Form form,boolean nested) {
         if(nested)return false;
-        for(var state:form.states.getAllTyped())for(var id:state.properties.tracks.keySet())
-            if(id.kind()==mchorse.bbs_mod.film.replays.tracks.TrackKind.PROPERTY && id.formPath().isEmpty() && BoneAnchors.isKey(id.subject()))return true;
+        for(var state:form.states.getAllTyped()) {
+            if(localDefinitions(state.properties))return true;
+            for(var id:state.properties.tracks.keySet())
+                if(id.kind()==mchorse.bbs_mod.film.replays.tracks.TrackKind.PROPERTY && id.formPath().isEmpty() && BoneAnchors.isKey(id.subject()))return true;
+        }
+        return false;
+    }
+    private static boolean localDefinitions(mchorse.bbs_mod.film.replays.FormProperties properties) {
+        mchorse.bbs_mod.utils.keyframes.KeyframeChannel<?> channel=properties.get(mchorse.bbs_mod.film.replays.tracks.TrackId.property("","anchor"));
+        if(channel!=null)for(var key:channel.getKeyframes())
+            if(key.getValue() instanceof mchorse.bbs_mod.forms.forms.utils.Anchor a)
+                for(var endpoint:AnchorReferences.endpoints(a))if(BindingAnchor.local(endpoint))return true;
         return false;
     }
     static boolean subtreeBinding(Form form) {

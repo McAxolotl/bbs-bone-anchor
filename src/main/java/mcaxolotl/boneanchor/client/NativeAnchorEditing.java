@@ -24,7 +24,9 @@ public final class NativeAnchorEditing {
         }
     }
     public static boolean rebase(BindingScenes.Slot source,String bone,Anchor from,Anchor next) {
-        if(source==null || source.parent!=null || bone==null || bone.isEmpty() || from==null || next==null)return false;
+        if(source==null || source.parent!=null || from==null || next==null)return false;
+        if(bone!=null && bone.isEmpty())bone=null;
+        if(bone==null && !BindingAnchor.local(from) && !BindingAnchor.local(next))return false;
         try(var request=BindingResolver.request(source.scene,BoneAnchorRuntime.transition(source.form))) {
             // Keep the edited keyframe's settled world pose. The pose itself is measured at the last
             // sampled transition, like BBS's own rebase; only the blend state (previous/x) is ignored.
