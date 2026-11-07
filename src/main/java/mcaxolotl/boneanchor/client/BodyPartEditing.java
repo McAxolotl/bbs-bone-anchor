@@ -15,6 +15,7 @@ import mchorse.bbs_mod.film.replays.FormProperties;
 import mchorse.bbs_mod.film.replays.Replay;
 import mchorse.bbs_mod.film.replays.tracks.TrackId;
 import mchorse.bbs_mod.forms.FormUtils;
+import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.MobForm;
@@ -76,8 +77,11 @@ public final class BodyPartEditing {
     private static void createReplay(UIFilmPanel panel, Replay source, BodyPart part, boolean move) {
         if (!convertible(panel, source, part)) return;
         Anchor anchor = bodyPartAnchor(panel.getData(), source, part);
+        var scene = BindingScenes.scene(panel.getController().editorController);
+        var slot = scene.slot(source.getId(), List.of(FormUtils.getPath(part.getForm()).split("/")));
+        if (slot == null) return;
         panel.flushUndo();
-        Replay target = createReplay(panel.getData(), source, part, anchor, panel.getCursor(), move);
+        Replay target = createReplay(panel.getData(), source, part, anchor, panel.getCursor(), move, slot.entity);
         if (target == null) return;
         panel.getController().createEntities();
         panel.replayEditor.replaysList.replays.refreshReplayList();
@@ -86,8 +90,12 @@ public final class BodyPartEditing {
     }
 
     /** Prepare the new Replay before mutating the film, then record the conversion as one edit. */
-    @SuppressWarnings("unchecked")
     static Replay createReplay(Film film, Replay source, BodyPart part, Anchor anchor, float cursor, boolean move) {
+        return createReplay(film, source, part, anchor, cursor, move, BodyPartMigration.independentEntity(part));
+    }
+
+    @SuppressWarnings("unchecked")
+    static Replay createReplay(Film film, Replay source, BodyPart part, Anchor anchor, float cursor, boolean move, IEntity input) {
         if (!ownsPart(film, source, part) || anchor == null || !Float.isFinite(cursor)
             || !anchor.transform.createMatrix().isFinite()) return null;
         Form bodyPartForm = FormUtils.copy(part.getForm());
@@ -96,9 +104,11 @@ public final class BodyPartEditing {
         Form owner = part.getManager().getOwner();
         Replay target = new Replay("");
         copyReplayPresentation(source, target);
-        target.keyframes.fromData(source.keyframes.toData());
+        if (BodyPartMigration.independentEntity(part) == null) target.keyframes.fromData(source.keyframes.toData());
+        else if (!BodyPartMigration.snapshot(target.keyframes, input, cursor)) return null;
         target.form.set(bodyPartForm);
         transferFormTracks(source.properties, target.properties, sourcePrefix);
+        BodyPartMigration.copyStates(part, bodyPartForm);
         clearRootAnchors(bodyPartForm);
         removeRootAnchorTracks(target.properties);
         bodyPartForm.anchor.set(anchor.copy());
@@ -111,6 +121,7 @@ public final class BodyPartEditing {
             if (move) {
                 retargetAnchors(film, source.getId(), sourcePrefix, target.getId());
                 removeFormTracks(source.properties, sourcePrefix);
+                BodyPartMigration.removeStates(part);
                 BaseValue.edit(source.form, value -> owner.parts.removeBodyPart(part));
             }
         });

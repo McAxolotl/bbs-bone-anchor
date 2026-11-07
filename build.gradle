@@ -60,7 +60,7 @@ def expectedSmokeReport = [
     RIG_CACHE_CHECKS: 7,
     DEPENDENCY_REGRESSIONS_OK: 8,
     SCENE_BINDING_CHECKS: 31,
-    BODY_PART_EDITING_CHECKS: 754,
+    BODY_PART_EDITING_CHECKS: 857,
 ]
 
 def smokeRequested = { -> project.hasProperty('smoke') || gradle.taskGraph.hasTask(':smokeTest') }

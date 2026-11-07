@@ -58,6 +58,9 @@ public final class BodyPartEditingTest {
         copy();
         convert();
         guards();
+        replayKeyframes();
+        entitySnapshots();
+        ancestorStates();
         parentFrames();
         standardRigFrames();
         interpolation();
@@ -161,7 +164,8 @@ public final class BodyPartEditingTest {
         var stateTracks = form.states.getAllTyped().get(0).properties;
         check(!stateTracks.has(TrackId.property("", "anchor")) && !stateTracks.has(TrackId.property("", BoneAnchors.key("inactive"))), "Dormant state Anchors cannot override the generated root Anchor");
         check(stateTracks.has(TrackId.property("", "lighting")), "Non-Anchor animation state tracks are preserved");
-        check(target.keyframes.toData().equals(f.source.keyframes.toData()), "Replay keyframes are copied");
+        check(target.keyframes.x.getKeyframes().isEmpty() && target.keyframes.grounded.interpolate(12) == 1D,
+            "Disabled useTarget retains its own grounded state without importing source movement");
         check(target.label.get().isEmpty() && !target.actor.get() && !target.fp.get(), "Actor flags and label stay at defaults");
     }
 
@@ -172,11 +176,123 @@ public final class BodyPartEditingTest {
         check(!BodyPartEditing.ownsPart(f.film, f.watcher, f.part), "Mismatched source Replay is rejected");
         check(BodyPartEditing.createReplay(f.film, f.source, f.part, null, 0, true) == null, "Missing parent frame rejects conversion");
         check(before.equals(f.film.toData()), "Rejected conversion is a no-op");
+        StubEntity invalid = new StubEntity(); invalid.setPosition(Double.NaN, 0, 0);
+        check(BodyPartEditing.createReplay(f.film, f.source, f.part, f.anchor, 0, true, invalid) == null, "Non-finite independent entity inputs reject conversion");
+        check(before.equals(f.film.toData()), "Rejected entity snapshots leave the entire film untouched");
+        check(BodyPartEditing.createReplay(f.film, f.source, f.part, f.anchor, 0, true, null) == null, "Missing independent entity input rejects conversion without throwing");
         f.source.relative.set(true);
         check(f.create(true) == null, "Relative-coordinate Replay is rejected");
         f.source.relative.set(false);
         f.root.parts.removeBodyPart(f.part);
         check(f.create(true) == null, "Detached BodyPart with a stale manager is rejected");
+    }
+
+    private static void replayKeyframes() {
+        for (boolean move : List.of(false, true)) {
+            for (boolean nested : List.of(false, true)) {
+                for (int mask = 0; mask < (nested ? 4 : 2); mask++) {
+                    Fixture f = new Fixture();
+                    BodyPart selected = nested ? f.child : f.part;
+                    selected.useTarget.set((mask & 1) != 0);
+                    if (nested) f.part.useTarget.set((mask & 2) != 0);
+                    f.source.keyframes.pitch.insert(0, 25D); f.source.keyframes.pitch.insert(20, -15D);
+                    f.source.keyframes.sneaking.insert(0, 1D); f.source.keyframes.stickLeftX.insert(10, .7D);
+                    f.source.keyframes.pitch.putLoop(new KeyframeLoop("look", 0, 20, 60));
+                    BaseType sourceTracks = f.source.keyframes.toData();
+                    boolean usesSource = nested ? mask == 3 : mask == 1;
+                    Replay neutral = new Replay(""); neutral.keyframes.grounded.insert(12, 1D);
+                    BaseType expected = usesSource ? sourceTracks : neutral.keyframes.toData();
+                    Replay target = BodyPartEditing.createReplay(f.film, f.source, selected,
+                        BodyPartEditing.bodyPartAnchor(f.film, f.source, selected), 12, move);
+                    check(target != null, "Use-target case creates a Replay for both convert and copy");
+                    check(expected.equals(target.keyframes.toData()), "Replay tracks follow the effective entity through the whole useTarget chain");
+                    check(sourceTracks.equals(f.source.keyframes.toData()), "Conversion and copy leave source Replay tracks untouched");
+                    Film reloaded = new Film(); reloaded.fromData(f.film.toData());
+                    check(expected.equals(reloaded.replays.getById(target.getId()).keyframes.toData()), "Use-target track selection survives film reload");
+                    if (usesSource) {
+                        target.keyframes.pitch.getKeyframes().get(0).setTick(7);
+                        check(sourceTracks.equals(f.source.keyframes.toData()), "Inherited Replay tracks are independent copies rather than live links");
+                    }
+                }
+            }
+        }
+    }
+
+    private static void entitySnapshots() {
+        for (boolean move : List.of(false, true)) {
+            Fixture f = new Fixture();
+            f.child.useTarget.set(true); f.part.useTarget.set(false);
+            StubEntity input = new StubEntity();
+            input.setPosition(1, 2, 3); input.setPitch(20); input.setHeadYaw(35);
+            input.setSneaking(true); input.setSprinting(true); input.setVelocity(.1f, .2f, -.3f);
+            input.getExtraVariables()[3] = .7f;
+            input.setEquipmentStack(net.minecraft.entity.EquipmentSlot.HEAD, new net.minecraft.item.ItemStack(net.minecraft.item.Items.IRON_HELMET));
+            input.setHotbarStack(2, new net.minecraft.item.ItemStack(net.minecraft.item.Items.DIAMOND, 4));
+            input.setAge(777); input.swingArm();
+            BaseType sourceBefore = f.source.keyframes.toData();
+            Replay target = BodyPartEditing.createReplay(f.film, f.source, f.child,
+                BodyPartEditing.bodyPartAnchor(f.film, f.source, f.child), 12, move, input);
+            StubEntity result = new StubEntity(); target.keyframes.apply(12, result);
+            check(result.getX() == 1 && result.getY() == 2 && result.getZ() == 3, "Independent runtime input retains its own position values");
+            check(result.getPitch() == 20 && result.getHeadYaw() == 35 && result.isSneaking() && result.isSprinting(), "Private entity orientation and state flags are serialized");
+            check(Math.abs(result.getVelocity().z + .3) < 1e-5 && result.getExtraVariables()[3] == .7f, "Velocity and extra animation inputs are retained");
+            check(result.getEquipmentStack(net.minecraft.entity.EquipmentSlot.HEAD).isOf(net.minecraft.item.Items.IRON_HELMET)
+                && result.getHotbarStack(2).getCount() == 4, "Equipment and hotbar inputs survive conversion");
+            Film restored = new Film(); restored.fromData(f.film.toData());
+            input.setPitch(-80); input.getHotbarStack(2).setCount(1);
+            Replay saved = restored.replays.getById(target.getId());
+            saved.keyframes.apply(12, result);
+            check(result.getPitch() == 20 && result.getHotbarStack(2).getCount() == 4, "Saved snapshot is independent of subsequent source entity changes");
+            check(sourceBefore.equals(f.source.keyframes.toData()) && result.getAge() != 777, "Source tracks are untouched and unrecordable runtime age is not silently linked");
+        }
+    }
+
+    private static void ancestorStates() {
+        for (boolean move : List.of(false, true)) {
+            for (boolean nested : List.of(false, true)) {
+                Fixture f = new Fixture();
+                BodyPart selected = nested ? f.child : f.part;
+                String path = FormUtils.getPath(selected.getForm());
+                var outer = f.root.states.addState();
+                outer.customId.set("outer"); outer.duration.set(40); outer.looping.set(true); outer.offset.set(3);
+                outer.properties.getOrCreate(f.root, TrackId.property(path, "lighting")).insert(0, .25f);
+                outer.properties.getOrCreate(f.root, TrackId.property(f.sibling.getId(), "lighting")).insert(0, .9f);
+                ((FormPropertiesAccessor)(Object) outer.properties).boneAnchor$foreignTracks().add(foreignTrack(path, "state"));
+                var inner = f.partForm.states.getAllTyped().get(0);
+                if (nested) {
+                    inner.customId.set("inner");
+                    inner.properties.register(TrackId.property(f.child.getId(), "lighting"), KeyframeFactories.FLOAT).insert(0, .6f);
+                } else {
+                    inner.id.set(outer.id.get()); inner.customId.set("outer");
+                }
+                var dormant = f.root.states.addState(); dormant.main.set(true);
+                dormant.properties.register(TrackId.property(path, "anchor"), KeyframeFactories.ANCHOR).insert(0, new Anchor("inactive", "", true, true, true));
+                BaseType before = f.film.toData();
+                f.history = new UIFormUndoHandler(new UIElement()); f.history.getUndoManager().setCallback(null);
+                Replay target = BodyPartEditing.createReplay(f.film, f.source, selected,
+                    BodyPartEditing.bodyPartAnchor(f.film, f.source, selected), 12, move);
+                var states = target.form.get().states.getAllTyped();
+                check(states.size() == 2, "Both own and ancestor state definitions survive promotion");
+                var migrated = states.stream().filter(state -> state.duration.get() == 40).findFirst().orElseThrow();
+                check(migrated.looping.get() && migrated.offset.get() == 3, "Ancestor state timing and loop metadata are retained");
+                check(migrated.properties.has(TrackId.property("", "lighting")) && migrated.properties.tracks.size() == 1,
+                    "Ancestor state tracks are rebased and unrelated sibling tracks excluded");
+                check(((FormPropertiesAccessor)(Object) migrated.properties).boneAnchor$foreignTracks().size() == 1,
+                    "Unknown ancestor state tracks are retained");
+                migrated.properties.applyProperties(target.form.get(), 0);
+                check(Math.abs(target.form.get().lighting.get() - .25f) < 1e-5, "Migrated state drives the promoted form through native property evaluation");
+                migrated.properties.resetProperties(target.form.get());
+                check(outer.properties.has(TrackId.property(path, "lighting")) != move
+                    && outer.properties.has(TrackId.property(f.sibling.getId(), "lighting")), "Only conversion removes transferred ancestor tracks");
+                if (nested) check(inner.properties.has(TrackId.property(f.child.getId(), "lighting")) != move, "Each ancestor uses its own relative subtree prefix");
+                else check(!states.get(0).id.get().equals(migrated.id.get()) && !states.get(0).customId.get().equals(migrated.customId.get()),
+                    "Colliding state IDs and custom triggers are not overwritten");
+                Film saved = new Film(); saved.fromData(f.film.toData());
+                check(saved.replays.getById(target.getId()).form.get().states.getAllTyped().size() == 2, "Migrated states survive film serialization");
+                f.history.submitUndo(true); f.history.getUndoManager().undo(f.film);
+                check(before.equals(f.film.toData()), "Undo restores ancestor state definitions and subtree tracks as one edit");
+            }
+        }
     }
 
     private static void parentFrames() {
