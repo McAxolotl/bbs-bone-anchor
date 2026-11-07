@@ -1,1 +1,1 @@
-{"schemaVersion":1,"id":"bbs_bone_anchor_smoke","version":"1.0.0","name":"Bone Anchor integration tests","environment":"client","entrypoints":{"bbs-client-addon":["mcaxolotl.boneanchor.IntegrationTestAddon"]},"depends":{"bbs_bone_anchor":"*"}}
+{"schemaVersion":1,"id":"bbs_bone_anchor_smoke","version":"1.0.1","name":"Bone Anchor integration tests","environment":"client","entrypoints":{"bbs-client-addon":["mcaxolotl.boneanchor.IntegrationTestAddon"]},"depends":{"bbs_bone_anchor":"*"}}

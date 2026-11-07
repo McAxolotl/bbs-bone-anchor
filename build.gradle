@@ -1,5 +1,5 @@
 plugins { id 'fabric-loom' version '1.15-SNAPSHOT' }
-version = '1.0.0'
+version = '1.0.1'
 group = 'mcaxolotl'
 base { archivesName = 'bbs-bone-anchor' }
 repositories {
